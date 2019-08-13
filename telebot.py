@@ -20,15 +20,15 @@ logger.addHandler(consoleHandler)
 client = None
 database = None
 weekdays_dictionary = {"0": "Segunda-Feira", "1": "Terça-Feira", "2": "Quarta-Feira", "3": "Quinta-Feira", "4": "Sexta-Feira", "5": "Sábado", "6": "Domingo"}
-command_list_message="\nLista de comandos:\n\
-        */cadastro* ou *cadastro* - visualizar seus dados cadastros em meu banco de dados\n\
-        */email (EMAIL_DE_CADASTRO)* - atualizar o email cadastrado\n\
-        */cadastrar* - realizar um pré cadastro com suas informações, recuperadas pelo telegram\n\
-        */planilha (NOME_NA_PLANILHA)* - realiza o cadastro de seu nome identificador na planilha de café da manhã, note que o essa informação deve ser igual a escrita na planilha\n\
-        */telegram (on|off)* - altera configuração de alerta no telegram, *on* para começar a receber o alerta ou *off* para parar de receber o alerta\n\
-        */limpar_email* - remove email do cadastro, com isso você para de receber alertas no email\n\
-        */dia* ou *dia* - atualizar o dia da semana que deseja receber as notificações.\
-        */ajuda* ou *ajuda* - visualizar a lista de comandos novamente.\
+command_list_message="\nLista de comandos:\
+        \n*/cadastro* ou *cadastro* - visualizar seus dados cadastros em meu banco de dados\
+        \n*/email (EMAIL_DE_CADASTRO)* - atualizar o email cadastrado\
+        \n*/cadastrar* - realizar um pré cadastro com suas informações, recuperadas pelo telegram\
+        \n*/planilha (NOME_NA_PLANILHA)* - realiza o cadastro de seu nome identificador na planilha de café da manhã, note que o essa informação deve ser igual a escrita na planilha\
+        \n*/telegram (on|off)* - altera configuração de alerta no telegram, *on* para começar a receber o alerta ou *off* para parar de receber o alerta\
+        \n*/limpar_email* - remove email do cadastro, com isso você para de receber alertas no email\
+        \n*/dia* ou *dia* - atualizar o dia da semana que deseja receber as notificações.\
+        \n*/ajuda* ou *ajuda* - visualizar a lista de comandos novamente.\
         "
 
 def getDatabase():
@@ -207,7 +207,7 @@ def text_decoder(bot, update):
             else:
                 message = "Não foi possível atualizar e-mail, por favor inicie o cadastro com /cadastro"
         else:
-            message = "Oi :)"
+            message = "😬 Desculpe ainda não aprendi a responder sua mensagem"
         bot.send_message(
             chat_id=update.message.chat_id,
             text=message
@@ -223,15 +223,18 @@ def build_menu(buttons, n_cols, header_buttons=None, footer_buttons=None):
 
 def update_notification_weekday(user_id, choosen_weekday):
     global weekdays_dictionary
+    status = True
     message = "Configuração atualizada."
     if(choosen_weekday != None and choosen_weekday != "" and weekdays_dictionary.get(choosen_weekday) != None) :
         user_collection = getUserCollection()
         result = user_collection.update_one({"_id": str (user_id)},  {"$set": {"alert_weekday": choosen_weekday, "updated_at": datetime.datetime.now()}})
         if(result.modified_count <= 0):
+            status = False
             message = "Não foi encontrar o cadastro a ser atualizado, por favor tente novamente mais tarde."
     else:
-        message = "Opção informada é inválida"
-    return message
+        status = False
+        message = "Opção informada é inválida."
+    return message, status
 
 def show_week_day_keyboard(bot, update):
     button_list = [
@@ -251,22 +254,49 @@ def show_week_day_keyboard(bot, update):
     )
 
 def callback_handler(bot, update):
+    status = False
+    send_message = False
     message = "Configuração atualizada."
     query = update.callback_query
     if("weekday" in query.data):
-        message = update_notification_weekday(query.message.chat.id,query.data.replace("weekday=", "") )
-    bot.answer_callback_query(
-        callback_query_id=query.id,
-        text=message
-    )
+        message, status = update_notification_weekday(query.message.chat.id,query.data.replace("weekday=", ""))
+        send_message = status
+    elif("spreadsheetName" in query.data):
+        message = "Nada foi feito!"
+        status = True
+        send_message = True
+    elif(query.data == "exitNameCallback"):
+        status = True
+    else:
+        message = "Não foi possível recuperar informação, por favor tente mais tarde."
+    if(send_message):
+        bot.answer_callback_query(
+            callback_query_id=query.id,
+            text=message
+        )
+        bot.send_message(
+            chat_id=query.message.chat.id,
+            text=message
+        )
+    if(status):
+        bot.deleteMessage(
+            chat_id=query.message.chat.id,
+            message_id=query.message.message_id
+        )
+
+def show_names_suggestion(bot, update):
+    names = ["1 - Fulando", "2 - Ciclano", "3 - João"]
+    button_list = []
+    footer_list = [InlineKeyboardButton("Fechar", callback_data="exitNameCallback")]
+    for name in names:
+        button_list.append(InlineKeyboardButton(name, callback_data="spreadsheetName={}".format(name)))
+    reply_markup = InlineKeyboardMarkup(build_menu(button_list, n_cols=2, footer_buttons=footer_list))
     bot.send_message(
-        chat_id=query.message.chat.id,
-        text=message
+        chat_id=update.message.chat_id,
+        text="Sugestões de nomes, caso seu identificador não esteja na lista ou deseje digitar manualmente utilize o comando /planilha (NOME_NA_PLANILHA)",
+        reply_markup=reply_markup
     )
-    bot.deleteMessage(
-        chat_id=query.message.chat.id,
-        message_id=query.message.message_id
-    )
+
 def main():
     updater = ext.Updater(os.environ['TELEGRAM_BOT_KEY'])
     dispatcher = updater.dispatcher
@@ -279,6 +309,7 @@ def main():
     dispatcher.add_handler(ext.CommandHandler('limpar_email', clear_email))
     dispatcher.add_handler(ext.CommandHandler('ajuda', help))
     dispatcher.add_handler(ext.CommandHandler('dia', show_week_day_keyboard))
+    dispatcher.add_handler(ext.CommandHandler('teste', show_names_suggestion))
     dispatcher.add_handler(ext.CallbackQueryHandler(callback_handler))
     dispatcher.add_handler(ext.MessageHandler(ext.Filters.text, text_decoder))
     logger.info("Starting polling")
