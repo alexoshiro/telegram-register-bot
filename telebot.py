@@ -2,7 +2,7 @@ import os
 import logging
 import datetime
 from telegram import ext, Bot, InlineKeyboardButton, InlineKeyboardMarkup
-from pymongo import MongoClient
+from database import getUserCollection
 from validate_email import validate_email
 from dotenv import load_dotenv
 load_dotenv()
@@ -17,32 +17,10 @@ logger.addHandler(handler)
 consoleHandler = logging.StreamHandler()
 consoleHandler.setFormatter(formatter)
 logger.addHandler(consoleHandler)
-client = None
-database = None
-weekdays_dictionary = {"0": "Segunda-Feira", "1": "Terça-Feira", "2": "Quarta-Feira", "3": "Quinta-Feira", "4": "Sexta-Feira", "5": "Sábado", "6": "Domingo"}
-command_list_message="\nLista de comandos:\
-        \n*/cadastro* ou *cadastro* - visualizar seus dados cadastros em meu banco de dados\
-        \n*/email (EMAIL_DE_CADASTRO)* - atualizar o email cadastrado\
-        \n*/cadastrar* - realizar um pré cadastro com suas informações, recuperadas pelo telegram\
-        \n*/planilha (NOME_NA_PLANILHA)* - realiza o cadastro de seu nome identificador na planilha de café da manhã, note que o essa informação deve ser igual a escrita na planilha\
-        \n*/telegram (on|off)* - altera configuração de alerta no telegram, *on* para começar a receber o alerta ou *off* para parar de receber o alerta\
-        \n*/limpar_email* - remove email do cadastro, com isso você para de receber alertas no email\
-        \n*/dia* ou *dia* - atualizar o dia da semana que deseja receber as notificações.\
-        \n*/ajuda* ou *ajuda* - visualizar a lista de comandos novamente.\
-        "
 
-def getDatabase():
-    global client
-    global database
-    if(client == None):
-        client = MongoClient(os.environ['MONGO_URL'])
-    if(database == None):
-        database = client['alerts']
-    return database
-    
-def getUserCollection():
-    db = getDatabase()
-    return db['users']
+weekdays_dictionary = {"0": "Segunda-Feira", "1": "Terça-Feira", "2": "Quarta-Feira", "3": "Quinta-Feira", "4": "Sexta-Feira", "5": "Sábado", "6": "Domingo"}
+command_list_message=""
+welcome_message = ""
 
 #client.close()
 def formatUserData(user):
@@ -64,7 +42,7 @@ def formatUserData(user):
 
 def signup(bot, update):
     logger.info('Signing up user {}, chat_id {}'.format(update.message.from_user.first_name,update.message.chat_id))
-    message = "Cadastro realizado com sucesso!"
+    message = "Pré cadastro realizado com sucesso!"
     user_collection = getUserCollection()
     user = user_collection.find_one({"_id": str (update.message.chat_id)})
     if(user == None):
@@ -74,7 +52,7 @@ def signup(bot, update):
             "spreadsheet_identifier":update.message.from_user.first_name,  
             "chat_id": str(update.message.chat_id),
             "alert_telegram": False,
-            "alert_weekday": 3,
+            "alert_weekday": "3",
             "alert_hour": "15:00",
             "created_at": datetime.datetime.now(),
             "updated_at": datetime.datetime.now(),
@@ -102,14 +80,15 @@ def register(bot, update):
     )
 
 def hello(bot, update):
-    global command_list_message
-    welcome = "Olá, sou um bot de cadastro para possibilitar o envio de alertas para você." + command_list_message
+    global welcome_message
+    welcome = "Olá, sou um bot de cadastro para possibilitar o envio de alertas para você.\n" + welcome_message
     logger.info('User {}, chat_id {} started to chat with bot'.format(update.message.from_user.first_name,update.message.chat_id))
     bot.send_message(
         chat_id=update.message.chat_id,
         text=welcome,
         parse_mode='Markdown'
     )
+    signup(bot, update)
 
 def update_email(bot, update, args):
     message = "E-mail atualizado com sucesso. A partir de agora você começará a receber alertas em seu email cadastro, caso deseje parar de receber utilize o comando /clear_email"
@@ -192,7 +171,7 @@ def text_decoder(bot, update):
     elif user_text == "ajuda":
         help(bot, update)
     elif user_text == "dia":
-        show_week_day_keyboard(bot, update)
+        show_weekday_keyboard(bot, update)
     else:
         is_valid = validate_email(update.message.text)
         if(is_valid):
@@ -236,7 +215,7 @@ def update_notification_weekday(user_id, choosen_weekday):
         message = "Opção informada é inválida."
     return message, status
 
-def show_week_day_keyboard(bot, update):
+def show_weekday_keyboard(bot, update):
     button_list = [
         InlineKeyboardButton("Segunda-Feira", callback_data="weekday=0"),
         InlineKeyboardButton("Terça-Feira", callback_data="weekday=1"),
@@ -287,10 +266,10 @@ def callback_handler(bot, update):
 def show_names_suggestion(bot, update):
     names = ["1 - Fulando", "2 - Ciclano", "3 - João"]
     button_list = []
-    footer_list = [InlineKeyboardButton("Fechar", callback_data="exitNameCallback")]
+    footer_button = InlineKeyboardButton("Fechar", callback_data="exitNameCallback")
     for name in names:
         button_list.append(InlineKeyboardButton(name, callback_data="spreadsheetName={}".format(name)))
-    reply_markup = InlineKeyboardMarkup(build_menu(button_list, n_cols=2, footer_buttons=footer_list))
+    reply_markup = InlineKeyboardMarkup(build_menu(button_list, n_cols=2, footer_buttons=footer_button))
     bot.send_message(
         chat_id=update.message.chat_id,
         text="Sugestões de nomes, caso seu identificador não esteja na lista ou deseje digitar manualmente utilize o comando /planilha (NOME_NA_PLANILHA)",
@@ -298,17 +277,30 @@ def show_names_suggestion(bot, update):
     )
 
 def main():
+    global welcome_message
+    global command_list_message
+    try:
+        with open("welcome.txt", 'r', encoding='utf8') as welcome_file:
+            welcome_message = welcome_file.read()
+    except FileNotFoundError:
+        logger.error('failed to load welcome.txt')
+    try:
+        with open("commands.txt", 'r', encoding='utf8') as commands_file:
+            command_list_message = commands_file.read()
+    except FileNotFoundError:
+        logger.error('failed to load welcome.txt')
+
     updater = ext.Updater(os.environ['TELEGRAM_BOT_KEY'])
     dispatcher = updater.dispatcher
     dispatcher.add_handler(ext.CommandHandler('cadastro', register))
     dispatcher.add_handler(ext.CommandHandler('start', hello))
-    dispatcher.add_handler(ext.CommandHandler('cadastrar', signup))
+    #dispatcher.add_handler(ext.CommandHandler('cadastrar', signup))
     dispatcher.add_handler(ext.CommandHandler('email', update_email, pass_args=True))
     dispatcher.add_handler(ext.CommandHandler('planilha', register_spreadsheet_name, pass_args=True))
     dispatcher.add_handler(ext.CommandHandler('telegram', change_alert_telegram, pass_args=True))
     dispatcher.add_handler(ext.CommandHandler('limpar_email', clear_email))
     dispatcher.add_handler(ext.CommandHandler('ajuda', help))
-    dispatcher.add_handler(ext.CommandHandler('dia', show_week_day_keyboard))
+    dispatcher.add_handler(ext.CommandHandler('dia', show_weekday_keyboard))
     dispatcher.add_handler(ext.CommandHandler('teste', show_names_suggestion))
     dispatcher.add_handler(ext.CallbackQueryHandler(callback_handler))
     dispatcher.add_handler(ext.MessageHandler(ext.Filters.text, text_decoder))

@@ -1,0 +1,9 @@
+Lista de comandos:
+*/cadastro* ou *cadastro* - visualizar seus dados cadastros em meu banco de dados
+*/email (EMAIL_DE_CADASTRO)* - atualizar o email cadastrado
+*/cadastrar* - realizar um pré cadastro com suas informações, recuperadas pelo telegram
+*/planilha (NOME_NA_PLANILHA)* - realiza o cadastro de seu nome identificador na planilha de café da manhã, note que o essa informação deve ser igual a escrita na planilha
+*/telegram (on|off)* - altera configuração de alerta no telegram, *on* para começar a receber o alerta ou *off* para parar de receber o alerta
+*/limpar_email* - remove email do cadastro, com isso você para de receber alertas no email
+*/dia* ou *dia* - atualizar o dia da semana que deseja receber as notificações.
+*/ajuda* ou *ajuda* - visualizar a lista de comandos novamente.
