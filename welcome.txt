@@ -1,6 +1,9 @@
+Olá, sou um bot de cadastro para possibilitar o envio de alertas para você.
 1° Realize o cadastro caso ainda não possua, comando /cadastrar
 2° Atualize o identificador da planilha de café da manhã no cadastro, comando /planilha (NOME\_NA\_PLANILHA). Ex.:/planilha 1 - Fulano, ATENÇÃO: o nome deve ser igual a planilha
 3° Atualize o email no cadastro caso deseje receber alertas no email, comando /email (EMAIL\_DE\_CADASTRO). Ex.: /email fulano@example.com 
 4° Ative as notificações no telegram caso deseje receber alertas no telegram, comando /telegram on
 5° Selecione o dia que deseja receber a notificação, comando /dia, irá abrir um menu para selecionar o dia da semana
 Caso deseje visualizar todos os comandos escreva /ajuda ou ajuda
+
+Nota: Infelizmente, estou limitado a enviar notificações apenas as 11:00 do dia e cada pessoa pode selecionar apenas 1 dia. Não se preocupe, estou trabalhando para melhorar.

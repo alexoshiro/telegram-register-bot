@@ -81,11 +81,10 @@ def register(bot, update):
 
 def hello(bot, update):
     global welcome_message
-    welcome = "Olá, sou um bot de cadastro para possibilitar o envio de alertas para você.\n" + welcome_message
     logger.info('User {}, chat_id {} started to chat with bot'.format(update.message.from_user.first_name,update.message.chat_id))
     bot.send_message(
         chat_id=update.message.chat_id,
-        text=welcome,
+        text=welcome_message,
         parse_mode='Markdown'
     )
     signup(bot, update)
