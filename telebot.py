@@ -114,9 +114,13 @@ def register_spreadsheet_name(bot, update, args):
         new_identifier = " ".join(args)
         logger.info('Updating user {} spreadsheet user identifier to {}'.format(update.message.chat_id, new_identifier))
         user_collection = getUserCollection()
-        result = user_collection.update_one({"_id": str (update.message.chat_id)},  {"$set": {"spreadsheet_identifier": new_identifier, "updated_at": datetime.datetime.now()}})
-        if(result.modified_count <= 0):
-            message = "Não foi encontrar o cadastro a ser atualizado, por favor tente novamente mais tarde."
+        found = user_collection.find_one({"spreadsheet_identifier": new_identifier})
+        if(found == None):
+            result = user_collection.update_one({"_id": str (update.message.chat_id)},  {"$set": {"spreadsheet_identifier": new_identifier, "updated_at": datetime.datetime.now()}})
+            if(result.modified_count <= 0):
+                message = "Não foi encontrar o cadastro a ser atualizado, por favor tente novamente mais tarde."
+        else:
+            message = "Não foi possível atualizar cadastro, já existe outra usuário com esse nome cadastrado."
     else:
         message = "Para utilizar esse comando é necessário informar um texto."
     bot.send_message(
